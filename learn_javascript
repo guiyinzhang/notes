@@ -1,3 +1,684 @@
+基础:
+	在 ECMAScript 中，不能访问对象的物理表示，只能访问对象的引用。每次创建对象，存储在变量中的都是该对象的引用，而不是对象本身。
+
+Object 对象
+
+因为 ECMAScript 中的 Object 对象与 Java 中的 java.lang.Object 相似，ECMAScript 中的所有对象都由这个对象继承而来，
+Object 对象中的所有属性和方法都会出现在其他对象中，所以理解了 Object 对象，就可以更好地理解其他对象。
+
+Object 对象具有下列属性：
+constructor
+对创建对象的函数的引用（指针）。对于 Object 对象，该指针指向原始的 Object() 函数。
+Prototype
+对该对象的对象原型的引用。对于所有的对象，它默认返回 Object 对象的一个实例。
+Object 对象还具有几个方法：
+hasOwnProperty(property)
+判断对象是否有某个特定的属性。必须用字符串指定该属性。（例如，Object.prototype.hasOwnProperty.call(obj,"name")）
+IsPrototypeOf(object)
+判断该对象是否为另一个对象的原型。
+PropertyIsEnumerable
+判断给定的属性是否可以用 for...in 语句进行枚举。
+ToString()
+返回对象的原始字符串表示。对于 Object 对象，ECMA-262 没有定义这个值，所以不同的 ECMAScript 实现具有不同的值。
+ValueOf()
+返回最适合该对象的原始值。对于许多对象，该方法返回的值都与 ToString() 的返回值相同。
+
+
+
+
+从混合到动态原型方法:
+function Car(sColor,iDoors,iMpg) {
+  this.color = sColor;
+  this.doors = iDoors;
+  this.mpg = iMpg;
+  this.drivers = new Array("Mike","John");
+  
+  if (typeof Car._initialized == "undefined") {
+    Car.prototype.showColor = function() {
+      alert(this.color);
+    };
+	
+    Car._initialized = true;
+  }
+}
+
+function Car() {
+  var oTempCar = new Object;
+  oTempCar.color = "blue";
+  oTempCar.doors = 4;
+  oTempCar.mpg = 25;
+  oTempCar.showColor = function() {
+    alert(this.color);
+  };
+
+  return oTempCar;
+}
+
+
+
+
+
+
+prototype 对象的任何属性和方法都被传递给那个类的所有实例。
+
+对象冒充:
+其原理如下：构造函数使用 this 关键字给所有属性和方法赋值（即采用类声明的构造函数方式）。因为构造函数只是一个函数，
+所以可使 ClassA 构造函数成为 ClassB 的方法，然后调用它。ClassB 就会收到 ClassA 的构造函数中定义的属性和方法。例如，用下面的方式定义 ClassA 和 ClassB：
+
+关键字 this 引用的是构造函数当前创建的对象。不过在这个方法中，this 指向的所属的对象。这个原理是把 ClassA 作为常规函数来建立继承机制，
+而不是作为构造函数。如下使用构造函数 ClassB 可以实现继承机制：
+请记住，函数名只是指向它的指针
+
+this
+var makeGlobal = myFavoriteComic.returnFavorite;
+makeGlobal();
+
+makeGlobal.bind(myFavoriteComic);
+
+this换绑
+
+function classA(name){
+	this.name = name;
+	this.showName = function(){
+		console.log("classA name:" + name);
+	}
+}
+
+function classB(age){
+	this.age = age;
+	this.showAge = function(){
+		console.log("classB age:" + age);
+	}
+}
+
+function classC(sex,name,age){
+	this.showName = classA;
+	this.showName(name);
+	this.showAge = classB;
+	this.showAge(age);
+	this.sex = sex;
+	
+	
+}
+
+var c = new classC('man','xx','oo');
+var c2 = new classC('woman','oo','xx');
+
+ClassB.prototype = new ClassA();
+注意：调用 ClassA 的构造函数，没有给它传递参数。这在原型链中是标准做法。要确保构造函数没有任何参数
+
+与对象冒充相似，子类的所有属性和方法都必须出现在 prototype 属性被赋值后，因为在它之前赋值的所有方法都会被删除。为什么？因为 prototype 属性被替换成了新对象，
+添加了新方法的原始对象将被销毁。所以，为 ClassB 类添加 name 属性和 sayName() 方法的代码如下：
+
+var objB = new ClassB();
+alert(objB instanceof ClassA);	//输出 "true"
+alert(objB instanceof ClassB);	//输出 "true"
+
+不过使用对象冒充时不能使用原型继承。
+原型链的弊端是不支持多重继承。记住，原型链会用另一类型的对象重写类的 prototype 属性。
+对象冒充的主要问题是必须使用构造函数方式，这不是最好的选择。
+不过如果使用原型链，就无法使用带参数的构造函数了
+
+在前一章，我们曾经讲解过创建类的最好方式是用构造函数定义属性，用原型定义方法。这种方式同样适用于继承机制，用对象冒充继承构造函数的属性，
+用原型链继承 prototype 对象的方法。
+
+function ClassA(sColor) {
+    this.color = sColor;
+}
+
+ClassA.prototype.sayColor = function () {
+    alert(this.color);
+};
+
+function ClassB(sColor, sName) {
+    ClassA.call(this, sColor);//在 ClassB 构造函数中，用对象冒充继承 ClassA 类的 sColor 属性
+    this.name = sName;
+}
+
+ClassB.prototype = new ClassA();//用原型链继承 ClassA 类的方法。
+
+ClassB.prototype.sayName = function () {
+    alert('x');
+};
+
+var b = new ClassB('x','b');
+
+由于这种混合方式使用了原型链，所以 instanceof 运算符仍能正确运行。
+
+
+
+
+
+function ClassA() {
+	color = "red",
+	thisSay = function(){
+		alert(0);
+	}
+}
+
+ClassA.prototype.sayColor = function () {
+    alert(this.color);
+};
+
+function ClassB(){
+	
+}
+
+ClassB.prototype = ClassA;
+ClassB.prototype.sayName = function () {
+    alert('bb');
+}
+var b = new ClassB();
+
+
+
+function StringBuffer () {
+  this._strings_ = new Array();
+}
+
+StringBuffer.prototype.append = function(str) {
+  this._strings_.push(str);
+};
+
+StringBuffer.prototype.toString = function() {
+  return this._strings_.join("");
+};
+
+重命名
+Array.prototype.enqueue = function(vItem) {
+  this.push(vItem);
+};
+
+
+
+
+
+注意: 简单的使用 Bar.prototype = Foo.prototype 将会导致两个对象共享相同的原型。 因此，改变任意一个对象的原型都会影响到另一个对象的原型，
+在大多数情况下这不是希望的结果。
+
+注意: 不要使用 Bar.prototype = Foo，因为这不会执行 Foo 的原型，而是指向函数 Foo。 因此原型链将会回溯到 Function.prototype 而不是 Foo.prototype，
+因此 method 将不会在 Bar 的原型链上。
+
+function foo(a, b, c) {alert(a+"-"+b+"-"+c);}
+
+var bar = {};
+foo.apply(bar, [1, 2, 3]); // 数组将会被扩展，如下所示
+foo.call(bar, 1, 2, 3); // 传递到foo的参数是：a = 1, b = 2, c = 3
+
+Foo.method = function() {
+    var that = this;
+    function test() {
+        // 使用 that 来指向 Foo 对象
+    }
+    test();
+}
+
+为了正确的获得循环序号，最好使用 匿名包裹器（译者注：其实就是我们通常说的自执行匿名函数）。
+
+内联函数 inlining（译者注：这里指的是解析器可以做内联处理）
+
+构造函数的return。
+
+//函数、构造函数、字面量、对象原型 区别--------字面量对象，直接对象是一次性消费。
+函数的构造函数是Function对象；
+函数的对象化（函数创建的对象）的构造函数是function的定义；
+函数的构造函数的原型是一个空函数；
+函数的原型和函数创建的对象的构造函数的原型相等（所以对象是函数构造出来的）；
+函数的构造函数的原型和函数的对象化的构造函数的原型不同；
+对象没有原型可以直接访问（这个和字面量的对象一样的）；
+
+
+
+名称解析顺序
+
+JavaScript 中的所有作用域，包括全局作用域，都有一个特别的名称 this 指向当前对象。
+
+函数作用域内也有默认的变量 arguments，其中包含了传递到函数中的参数。
+
+比如，当访问函数内的 foo 变量时，JavaScript 会按照下面顺序查找：
+
+当前作用域内是否有 var foo 的定义。
+函数形式参数是否有使用 foo 名称的。
+函数自身是否叫做 foo。
+回溯到上一级作用域，然后从 #1 重新开始。
+
+// 另外两种方式
++function(){}();
+(function(){}());
+
+var undefined = 123;
+(function(something, foo, undefined) {
+    // 局部作用域里的 undefined 变量重新获得了 `undefined` 值
+	console.log(something+"=="+foo+"----"+undefined);
+})('Hello World', 42);
+
+""           ==   "0"           // false
+0            ==   ""            // true
+0            ==   "0"           // true
+false        ==   "false"       // false
+false        ==   "0"           // true
+false        ==   undefined     // false
+false        ==   null          // false
+null         ==   undefined     // true
+" \t\r\n"    ==   0             // true
+
+
+""           ===   "0"           // false
+0            ===   ""            // false
+0            ===   "0"           // false
+false        ===   "false"       // false
+false        ===   "0"           // false
+false        ===   undefined     // false
+false        ===   null          // false
+null         ===   undefined     // false
+" \t\r\n"    ===   0             // false
+
+{} === {}
+
+尽管 instanceof 还有一些极少数的应用场景，typeof 只有一个实际的应用（译者注：这个实际应用是用来检测一个对象是否已经定义或者是否已经赋值）
+而这个应用却不是用来检查对象的类型。
+typeof foo !== 'undefined'
+上面代码会检测 foo 是否已经定义；如果没有定义而直接使用会导致 ReferenceError 的异常。 这是 typeof 唯一有用的地方
+
+
+Object.prototype.toString 类型
+
+function is(type, obj) {
+    var clas = Object.prototype.toString.call(obj).slice(8, -1);
+    return obj !== undefined && obj !== null && clas === type;
+}
+
+is('String', 'test'); // true
+is('String', new String('test')); // true
+
+JavaScript 标准文档中定义: [[Class]] 的值只可能是下面字符串中的一个： Arguments, Array, Boolean, Date, Error, Function, JSON, Math, Number, Object
+, RegExp, String.
+
+
+
++'010' === 10
+Number('010') === 10
+parseInt('010', 10) === 10  // 用来转换为整数
+
++'010.2' === 10.2
+Number('010.2') === 10.2
+parseInt('010.2', 10) === 10
+
+!!'foo';   // true
+!!'';      // false
+!!'0';     // true
+!!'1';     // true
+!!'-1'     // true
+!!{};      // true
+!!true;    // true
+
+
+
+
+
+function Foo() {
+    this.value = 42;
+}
+Foo.prototype = {
+    method: function() {}
+};
+
+function Bar() {}
+
+// 设置Bar的prototype属性为Foo的实例对象
+Bar.prototype = new Foo();
+Bar.prototype.foo = 'Hello World';
+
+// 修正Bar.prototype.constructor为Bar本身
+Bar.prototype.constructor = Bar;
+
+var test = new Bar() // 创建Bar的一个新实例
+var test2 = new Bar() // 创建Bar的一个新实例
+
+如果你想要在运行时改变改变对象的属性，并且让这个属性的新值被所有的该对象后代所继承，你就不能在对象的构造函数中定义这个属性。相反，你要将它添加在于构造函数向关联的原型上。例如，假设你将上面的代码修改如下
+
+第一种：构造函数绑定，即用call(apply)把父对象的this指向改为子对象
+缺点：不能继承原型上的属性和方法;
+第二种：prototype模式，即把子对象的prototype对象指向Animal的一个实例;
+缺点：如果子对象的prototype对象上有属性或方法时，将被清除;
+注意：当改了prototype对象的constructor时，记得改回来，否则将造成继承链紊乱;
+第三种：直接继承prototype，即child.prototype = parent.prototype;
+优点：相比第二种效率更高，比较省内存;
+缺点：如果子对象的prototype对象上有属性或方法时，将被清除;
+且子对象的prototype对象修改后父对象的prototype也会被修改;
+第四种：利用空对象作为中介，第三种的升级版;
+缺点：如果子对象的prototype对象上有属性或方法时，将被清除;
+且子对象的prototype对象修改后父对象的prototype也会被修改;
+第五种：拷贝继承
+缺点：只能继承原型上的属性和方法;
+优点：如果子对象的prototype对象上有属性或方法时，不会被清除,
+且子对象的prototype对象修改后父对象的prototype不会被修改;
+总结：继承加在原型上的属性和方法时用第五种，而继承写在构造函数里的属性和方法则用第一种，两则结合用
+
+
+
+/**
+ * 类类型判断，使用类类型(String,Number,Boolean,Function)
+ * ! typof 在标准类型定义值会差别,instanceof 也是。可用自定义类型比较。
+ * Class      Type
+	------------------
+	 String     string
+	 Number     object
+	 Boolean    object
+	 Date       object
+	 Error      object
+	 Array      object
+	 Function   function
+	 RegExp     object 
+	 Object     object
+ *
+ * @param type
+ * @param obj
+ * @return
+ */
+var TyepOf = {
+		String:"String",
+		Number:"Number",
+		Boolean:"Boolean",
+		Date:"Date",
+		Error:"Error",
+		Array:"Array",
+		Function:"Function",
+		RegExp:"RegExp",
+		Object:"Object"
+};
+
+TyepOf.prototype.isType = function(type, obj){
+	var clas = Object.prototype.toString.call(obj).slice(8, -1);
+    return obj !== undefined && obj !== null && clas === type;
+}
+
+/**
+ * 利用object或iframe 缓存js文件
+ * 只是缓存不会执行,不阻塞渲染及其它资源下载
+ * 
+ * 其它方式:
+ * 1.变更<script>位置
+ * 2.动态新<script>标签
+ * 3.绑定dom事件，去下载。
+ * 4.使用ajax下载文件或字符串。字符串用evel或Function FunctionBody。
+ * @param filePath 文件路径
+ * @return
+ */
+function CacheJsFile(filePath){
+	var cacheObj  = document.createElement('object');
+	cacheObj.data = filePath;
+	cacheObj.name = "cache_id";
+	cacheObj.width = 0;
+	cacheObj.height = 0;
+	document.body.appendChild(cacheObj);
+}
+
+
+/**
+ * copy继承 jquery方式
+ */
+function extendCopy (Parent,Children)
+{
+	if(TyepOf.isType(TyepOf.Object,Parent) || TyepOf.isType(TyepOf.Object,Children)){
+		return;
+	}
+	
+	var p = Parent || {};
+	var c = Children || {};
+	
+	for(var filed in p)
+	{
+		if(TyepOf.isType(TyepOf.Object,p[i]))
+		{
+			c[i] = p[i].constructor == Array ? [] : {};
+		}
+		c[i] = p[i];
+	}
+};
+
+/**
+ * 对象继承 YUI方式
+ * ! : 调用本时注意原型链上的方法申明时机
+ * hasOwnProperty
+ * isPrototypeOf
+ * 
+ * @param Parent 父
+ * @param Children 子
+ * @return 子
+ */
+function extendObj (Parent,Children)
+{	
+	if(TyepOf.isType(TyepOf.Object,Parent) || TyepOf.isType(TyepOf.Object,Children)){
+		return;
+	}
+	
+	var Temp = {};
+	Temp.prototype = Parent.prototype;
+	
+	Children.prototype = new  Temp();
+	Children.prototype.constructor = Children;
+	Children.uber = Parent.prototype;
+	
+	return Children;
+}
+
+/*
+ * "use strict" 
+ * 使用object进好好利用value
+ * Object.create 对象创建、继承和重用的强大
+ * Object.preventExtensions() 该方法阻止将任何新命名的特性添加到对象 
+ * Object.isExtensible() 测试命名特性是否可以添加到对象
+ * obj : {
+            value  : "Marvel Comics",
+            enumerable: true, 表明此特性在 for...in 循环和新的 Object.keys() 方法中是否可见。
+            writable: false,
+            configurable: false
+        }
+ * Object.seal():
+ *   1. Object.preventExtensions() ，阻止添加新特性，
+ *   2. configurable  = false;
+ *   3.（但不锁定对象的值），使其可预测，以用作数据存储
+ * Object.isSealed() 测试对象是否可配置
+ * 
+ * Object.freeze 调用 Object.seal() 来停止对象的配置
+ * writeable 标志设置为 false，提供一个完美静态的对象。
+ * Object.isFrozen() 测试对象是否冻结。
+ * 
+ * Object.getPrototypeOf()
+ *新方法 Object.getPrototypeOf() 返回对象的原型。该方法的值等同于非标准的 Object.__proto__ 特性。
+ * Object.keys(p) 方法返回一个字符串数组，表示一个对象自己的可数（enumerable）特性的名称，
+ *这些特性是在 enumerable 标志设置为 true 的正在接受调查的对象上直接定义的特性。
+ *Object.getOwnPropertyNames() 与上述方法类似，但还包含 enumerable 标志设置为 false 的特性。
+ * 
+ * 
+ * 
+ * var USComicPublishers = {
+    countryOfOrigin : {
+        value  : "USA",
+        enumerable: true,
+        writable: false,
+        configurable: false
+    },
+    medium : {
+        value  : "comic books",
+        enumerable: true,
+        writable: false,
+        configurable: false
+    }
+}
+var marvelProto = Object.create(
+//inherits properties from another Object
+    USComicPublishers,
+    {
+        publisher : {
+            value  : "Marvel Comics",
+            enumerable: true,
+            writable: false,
+            configurable: false
+        },
+        founded : {
+            value : "1939",
+            enumerable: true,
+            writable: false,
+            configurable: false
+        },
+        founder : {
+            value : "Martin Goodman",
+            enumerable: true,
+            writable: false,
+            configurable: false
+        },
+        headquarters : {
+            value : "417 5th Avenue, New York, NY, U.S.",
+            enumerable: true,
+            writable: true,
+            configurable: false
+        },
+        launchComic : {
+            value : function(){
+                
+                return true;
+            },
+            enumerable: false,
+            writable: true,
+            configurable: false
+        }
+    }
+);
+
+get set 方法
+Object.defineProperty(FantasticFour, "bestIssue", {
+    get: function () { return fave; },
+    set: function (num) {
+            fave = "The best single issue of Fantastic Four is issue #" + num;
+        }
+    }
+);
+ * 
+ */
+
+
+
+
+/*
+Array.forEach()
+
+function logger(element, index, array) {
+    console.log("The value of the element at index " + index + " is " + element); 
+}
+*/
+
+//LazyGridData()
+/*
+Array.map()
+Array.map() 返回一个新数组，新数组通过在原始数组中的每个元素上调用单个函数参数生成。提供的函数将数组中的元素接收为单个参数。清单 13 展示了一个简单示例。
+清单 13. Array.map() 示例
+ var arr = [8, 10, 13, 10, 8, 1, 5];
+function square(num){
+    return num * num;    
+}    
+console.log(arr.map(square));  
+>>>[64, 100, 169, 100, 64, 1, 25]
+Array.reduce() 和 Array.reduceRight()
+Reduce 和 reduceRight 都针对一个数组的两个元素执行一个提供的函数，遍历整个数组，生成单个值。Array.reduce 从左到右执行；Array.reduceRight() 从右到左处理数组。清单 14 展示了这两个方法示例，还展示了顺序的重要性。
+清单 14. 使用 Array.reduce() 和 Array.reduceRight()
+var arr = [8, 10, 13, 10, 8, 1, 5];
+
+console.log(arr.reduce(function(a, b){ return  a + b; }));           
+>>>55
+
+console.log(arr.reduce(function(a, b){ return  a +" "+ b; }));               
+>>>8 10 13 10 8 1 5
+
+console.log(arr.reduceRight(function(a, b){ return  a + b; }));           
+>>>55
+
+console.log(arr.reduceRight(function(a, b){ return  a +" "+ b; }));
+>>>5 1 8 10 13 10 8
+Array.filter()
+Array.filter() 函数返回一个新数组，新数组包含所有通过由单个函数参数实现的测试的元素。清单 15 展示了使用简单的平均/基数测试的示例。
+清单 15. 使用 Array.filter()
+var arr = [8, 10, 13, 10, 8, 1, 5];
+function odd(element, index, array) {
+     return (element%2);
+}
+console.log(arr.filter(odd));
+>>>[13, 1, 5]
+Array.every() 和 Array.some()
+Array.every() 和 Array.some() 针对单个函数参数测试一个数组元素。如果数组中的所有元素都通过由提供的函数实现的测试，Array.every() 将返回 true。如果数组中的任一元素都通过由提供的函数实现的测试，Array.some() 将返回 true。清单 16 展示了这两个函数使用一个简单的平均/基数测试的示例。
+清单 16. 使用 Array.every() 和 Array.some()
+var arr = [8, 10, 13, 10, 8, 1, 5];
+function odd(element, index, array) {
+     return (element%2);
+}
+console.log(arr.every(odd));
+>>>false
+
+console.log([1,3,5].every(odd))
+>>>true
+
+console.log(arr.some(odd));
+>>>true
+
+console.log([2,4,6].some(odd))
+>>>false
+Array.indexOf() 和 Array.lastIndexOf()
+Array.indexOf() 和 Array.lastIndexOf() 函数都返回一个指定元素在数组中的索引，如果不存在，则返回 -1。Array.indexOf 从数组的第一个元素（或一个可选的位置参数）开始向后搜索匹配值，直到数组末尾。Array.lastIndexOf 从数组的最后一个元素（或一个可选位置参数）向前搜索匹配值，直到数组开始。清单 17 显示了这两个方法的示例。
+清单 17. 使用 Array.indexOf() 和 Array.lastIndexOf()
+ var arr = [8, 10, 13, 10, 8, 1, 5];
+ 
+console.log("lastIndexOF is " + arr.lastIndexOf(10));
+>>>lastIndexOF is 3
+
+console.log("indexOF is " + arr.indexOf(10));
+>>>indexOF is 1
+*/
+
+
+/*
+ * JSON.parse()
+ * JSON.stringify()
+ * 
+ */
+
+
+
+/* 每个对象实例都有个属性成员用于指向到它的instanceof 对象(暂称为父对象)的原型(prototype)
+我们把这种层层指向父原型的关系称为[原型链 prototype chian]
+原型也具有父原型，因为它往往也是一个对象实例，除非我们人为地去改变它
+在JavaScript中，"一切都是对象，函数是第一型。"
+Function和Object都是函数的实例。
+Function的父原型指向到Function的原型，Function.prototype的父原型是Object的原型
+Object的父原型也指向到Function的原型，Object.prototype是所有父原型的顶层
+在spiderMonkey引擎中，父原型可以通过__proto__ 进行访问
+
+prototype 访问的是原型 
+__proto__ 访问的父原型 
+instanceof 原型链的父类
+*/
+
+Function.__proto__ == Function.prototype
+Object.__proto__ === Function.prototype
+
+Function.prototype.__proto__ === Object.prototype
+Object.prototype.__proto__ === null
+
+
+Function.prototype.hi = function(){alert('hi Function');} 
+Object.prototype.hi = function(){alert('hi Object');} 
+var a = function() { this.txt = 'a'; }; 
+a.prototype = { say: function(){alert('a');} }; 
+alert(a instanceof Function); //a是Function的实例;
+alert(a.__proto__ == = Function.prototype); //a的父原型指向到Function的原型; //a.__proto__父原型 Function //Function.prototype 父原型 Function
+alert(Function instanceof Object); //Function是Object的实例; 
+alert(Function.__proto__ === Function.prototype); //Function的父原型指向到Function的原型; 
+alert(Function.prototype.__proto__ === Object.prototype); //Function的原型的父原型指向到Object的原型 
+alert(Object.__proto__ == = Function.prototype); //Object的父原型指向到Function的原型; 
+alert(Object.prototype.__proto__); //Object的原型是所有父原型的顶端，它不再具有父原型,所以结果为null; 
+alert(a.prototype instanceof Object); //a的原型也是一个对象 
+alert(a.prototype.__proto__ == = Object.prototype); //a的原型的父原型指向Object的原型 };
+
 JavaScript : 
 
 
