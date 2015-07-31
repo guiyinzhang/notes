@@ -1,0 +1,325 @@
+2 和 3的区别:
+
+Python 3 提供了一个脚本叫做 2to3。学习它。喜欢它。使用它。用 2to3 移植代码到 Python 3 是一个有关 2to3 工具能够自动整理的所有东西的参考手册。很多这些东西都是语法的变更，因此了解 Python 3 里面许多的语法变更是一个好的起点。（print 现在是一个函数，`x` 不能使用，等等。）
+案例分析：移植 chardet 到 Python 3 记录了我努力（最终成功）把一个不平常的库从 Python 2 移植到 Python 3 的过程。它也许能帮助你；也许不能。这里存在一个相当陡的学习曲线，由于你首先需要稍微理解一下这个库，那样你才可以理解为什么它会损坏以及我如何修复它的。围绕字符串有很多损坏的地方。说到这个…
+字
+符串。吆。从哪儿开始呢。Python 2 有 “strings” 和 “Unicode strings”。Python 3 有 “bytes” 和 “strings”。也就是说，现在所有字符串都是 Unicode 的字符串，那么如果你想处理一个字节包，你可以使用新的 bytes 类型。Python 3 从不会在 strings 和 bytes 之间进行隐式的转换，因此在任何时候如果你不确信你拥有的是什么类型，你的代码几乎无疑的将会出问题。阅读 Strings 的章节 了解更多细节信息。
+贯
+穿整个这本书，Bytes 和 strings 的对比会一次又一次的出现。
+•
+在文件这章，你将了解到通过“二进制”模式和“文本”模式读取文件的区别；在文本模式下读取（和写入！）文件需要提供一个 encoding 参数。一些文本文件方法按照字符来计数，而另一些方法按照字节计数。如果你的代码采取一个字符等于一个字节的方式，那么在多字节表示一个字符的情况下将会出问题。
+•
+在 HTTP Web 服务这章，httplib2 模块通过 HTTP 获取头信息和数据。HTTP 头信息返回的是字符串，而 HTTP 正文则返回的是字节。
+• 在序列化 Python 对象这章，你将了解到为什么 Python 3 里面的 pickle 模块定义了一个和 Python 2 向后不兼容的新的数据类型。（提示：这就是因为字节和字符串的原因。） 同样 JSON 也根本不支持字节类型。我将向你展示如何解决这个问题。
+• 在案例分析：移植 chardet 到 Python 3这章，到处都是一大堆一大堆关于字节和字符串的东西。
+即使你不关心 Unicode （但实际上你会的），你也会想阅读一下 Python 3 里面的字符串格式，这和 Python 2 里面的完全不一样。
+迭代在 Python 3 里面无处不在，比起五年之前我写“深入Python” 的时候，我现在能更好的理解它们。你也需要理解他们，因为过去经常在 Python 2 里面返回列表的很多函数，在 Python 3 里面将返回迭代。至少，你应该阅读一下迭代章节的下半部分和高级迭代章节的下半部分。
+根据大家的要求，我已经添加了一个关于特殊方法名称的附录，有点像 Python 文档的 “数据模型”章节但是包含更多的内容。
+当我在撰写“深入 Python”的时候，所有可用的 XML 库都很糟糕。接着 Fredrik Lundh 编写了非常优秀的 ElementTree。Python 的专家们聪明的把 ElementTree 变成了标准库的一部分，然后现在它构成了我的新的 XML 章节的基础。解析 XML 的那些老的方式仍然可用，但是你应该避免使用它们，因为他们很糟糕！
+除此之外，还有个关于 Python 的新东西 — 不是语言上的，而是社区中的 — 像 Python 包装索引(PyPI)的出现。Python 提供了实用工具类用来将你的代码打包成标准格式，并分发那些包到 PyPI 中。阅读 打包 Python 库了解详细信息。
+
+
+----------------------------------------结合例子理解-----------------------------------------------
+所有的东西区分大小写
+
+通过代码统一的缩进及分割符:来实现分割代码块，使用回车分割语句。
+
+对象:
+    python一切都是对象。所以东西都是对象，对象都有属性和方法，如:所有的函数都有一个__doc__返回函数定义的doc。sys都有一个path属性。
+    在python调用中，可以将函数、模块、类的实例作为实参传另一个函数。也就是所谓的所有都是对象。
+
+异常:
+    场景: 导入的包有错误，连接数据库错误，对象定义、逻辑业务异常。
+    通过raise 抛出异常，通过try...except处理异常，异常会整个调用堆栈上向上返回。如果一直没有被处理就stop 了。
+    try:
+        import chardet
+    except:
+        chardet = None
+    if  chardet:
+    else:
+
+Example :
+
+'''import 搜索sys.path里面的所有目录，通过sys.path.insert(0, new_path)添加查找目录'''
+'''
+    当导入一个模块时，你就可以引用它的任何公有的函数、类、或者属性。模块可以通过这种方式访问其他模块的功能。
+    访问方式: 模块名 + 函数、类、或者属性。
+    查看方式: 模块名 + __doc__。
+    导入方式:
+        1.  import 模块名
+        2.  import 模块我 as 别名
+        3.  from 模块名 import 对象
+'''
+import sys
+
+SUFFIXES = {1000: ['KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
+            1024: ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB']}
+
+'''函数要先声明后使用。不会提升。
+    def定义函数，不定义返回值。每个函数都有返回值，默认返回None。'''
+def log(msg):
+    print("-->" + msg)
+
+
+def approximate_size(size, a_kilobyte_is_1024_bytes=True):
+    '''Convert a file size to human‐readable form.
+    Keyword arguments:
+    size ‐‐ file size in bytes
+    a_kilobyte_is_1024_bytes ‐‐ if True (default), use multiples of 1024
+    if False, use multiples of 1000
+    Returns: string
+    '''
+    if size < 0:
+        raise ValueError('number must be non‐negative')
+    multiple = 1024 if a_kilobyte_is_1024_bytes else 1000  '''声明变量并且必须赋值'''
+    for suffix in SUFFIXES[multiple]:
+        size /= multiple
+        log(suffix)
+        if size < multiple:
+            return '{0:.1f} {1}'.format(size, suffix)
+    raise ValueError('number too large')
+
+'''所有模块都有这个属性，属性的值取决的调用方式，import 对应的是模块的文件名，不包含路径、扩展名称。如果直接运行，对应的就是__main__'''
+if __name__ == '__main__':
+    '''当参数顺序不同时，需要指定参数名称。approximate_size(a_kilobyte_is_1024_bytes = False,size=100)。只要你有一个命名参数，它右边的所有参数也都需要是命名参数。'''
+    print(approximate_size(1000000000000, False))
+    print(approximate_size(1000000000000))
+
+----------------------------------------------------------------------------------------
+
+
+
+
+
+----------------------------------------------------------------------内置数据类型--------------
+每个值都有一种数据类型，但您并不需要声明变量的数据类型。Python 根据每个变量的初始赋值情况分析其类型，并在内部对其进行跟踪
+
+Booleans : True | False
+Numbers :
+Strings［字符串型］ 是 Unicode 字符序列，例如： 一份 HTML 文档。
+Bytes［字节］ 和 Byte Arrays［字节数组］， 例如: 一份 JPEG 图像文件。
+
+Lists［列表］ :
+        是值的有序序列，类似java ArrayList。空列表是假
+        >>>a_list = ['a', 'b', 'mpilgrim', 'z', 'example']
+        切片:
+            >>>a_list[1:3] #包含1 不包含3
+            >>>a_list[:3] #3前面的
+            >>>a_list[3:] #3后面的
+            >>>a_list[:] #返回所有，并不同于a_list。类似copy
+
+        各种操作:
+        >>> a_list = [0,2]
+        >>> a_list.insert(1,1)       #插入元素
+        >>> a_list = a_list + [3,4]  #内存中创建连接后数组在赋值，性能差
+        >>> a_list.extend([5,6])     #列表是类的方式实现，创建列表相当于实例化类。它具有一些方法和属性。
+        >>> a_list.append('7.0')     #append不同志于extend。前者是append一个对象到列表，extend则类似join
+
+
+        >>> a_list = ['a','b','c','d','e','f','g','h','i','j','k']
+        >>> a_list.count('a')        #元素出现次数
+        >>> a_list.index('j')        #查找第一次下标，不存在会报错ValueError。param2和param3是代表start end .
+        >>> 'e' in a_list            #查找是不否存在  它已于 count
+        True
+        >>> del a_list[1]            #删除下标为1
+        >>> a_list.remove('j')       #删除元素'j'，删除第一次出现。不是所有，如果不存在ValueError
+        >>> a_list.pop()             #删除最后一个元素，并返回。空列表时报错。
+        >>> a_list.pop(3)            #删除下标为3的元素
+
+Tuples［元组］ :
+        是有序而不可变的列表，only read。
+        tuple()冻结列表，返回元组。
+        list()解冻列表，返回列表。
+        和列表的区别:
+            1.创建使用()。
+            a_tuple = ("a", "b", "mpilgrim", "z", "example")
+
+            2.没有append()、 extend()、 insert()、remove() 和 pop() 这样的方法。
+            3.元组的速度比列表更快。常用于常量遍历
+            4.对不需要改变的数据进行“写保护”将使得代码更加安全
+            5.一些元组可用作字典键。列表不能作为字典键。它是可变的。
+            6.元素赋值。
+                >>> v = ('a', 2, True)
+                >>> (x, y, z) = v
+                >>>(MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY) = range(7)  #range返回迭代器
+
+Sets［集合］ :
+        是装满无序值的包裹。多个集合可进行交、并、联合
+        空集为假
+        各种操作
+            >>> a_set = {1}                         #创建集合
+            >>> a_list = ['a', 'b', 'mpilgrim', True, False, 42]
+            >>> a_set = set(a_list)                 #创建集合
+            >>> len(a_list)
+            >>> a_set  = set()                      #创建集合  空的集合，不能使用 a_set = {}创建。
+            >>> a_set.add('xx')                     #添加值，如果存在，不添加。
+            >>> a_set.update({...}, {...})          #添加集合，相当合并当前集合。直接修改引用。多次调用add
+            >>> a_set.discard(4)                    #删除值，不存在是不报错
+            >>> a_set.remove(5)                     #删除值，报错
+            >>> a_set.pop()                         #无序删除最后一个。空集合是报错。
+            >>> a_set.clear()                       #等价于a_set = set()。
+            >>> a_set = {...}
+            >>> 30 in a_set                         #是否存在
+            >>> b_set = {...}
+            >>> a_set.union(b_set)                  #合并
+            >>> a_set.intersection(b_set)           #交集
+            >>> a_set.difference(b_set)             #在a_set出现但没有在b_set出现的值。
+            >>> a_set.symmetric_difference(b_set)   #差集
+            >>> a_set.issubset(b_set)               #a_set是b_set的子集
+            >>> b_set.issuperset(a_set)             #b_set是a_set的超集
+
+Dictionaries［字典］:
+        是键值对的无序包裹。
+        空值为假
+        字典就是javascript里面的字面量对象。
+
+None类似于null/undefined
+
+
+练习:
+------------------------------
+
+import os                       #抽象操作系统，提供统一的api调用
+os.getcwd()                     #当前工作环境路径
+os.chdir('')                    #修改工作环境路径
+os.path.expanduser('~')         #用户Home
+//拼接路径
+os.path.join(os.path.expanduser('~'), 'diveintopython3', 'examples', 'humansize.py')
+//分割路径
+(dirname, filename) = os.path.split(pathname)
+//分割完成的文件名和
+(shortname, extension) = os.path.splitext(filename)
+
+import glob                     #glob 模块是Python标准库中的另一个工具，它可以通过编程的方法获得一个目录的内容，并且它使用熟悉的命令行下的通配符
+glob.glob('examples/*.xml')     #列出文件列表
+os.path.realpath('example.py')  #获取绝对路径
+>>> os.stat('example.py')       #获取文件元信息
+nt.stat_result(st_mode=33206, st_ino=844424930139897, st_dev=0, st_nlink=1, st_uid=0, st_gid=0, st_size=2103, st_atime=1
+438053039, st_mtime=1438066710, st_ctime=1438052960)
+
+import time                     #time 模块是Python标准库的一部分。 它包含用于在不同时间格式中转换，将时间格式化成字符串以及处理时区的函数。
+
+
+
+列出当前路径下的所有文件的绝对路径:
+
+
+import os,glob
+
+列表和元组:
+[os.path.realpath(f) for f in glob.glob("*")]
+[(os.stat(f),os.path.realpath(f)) for f in glob.glob("*")]
+[f for f in glob.glob("*") if os.path.splitext(f)[1]=='.py'] == [f for f in glob.glob("*.py")]
+
+集合或字典:
+metadata_dict = {f:os.stat(f) for f in glob.glob("*.py")}
+list(metadata_dict.keys())
+#通过对{key,value for key,value in metadata_dict.item()}进行迭代处理。
+
+
+------------------------------------------------字符串------------------------------------
+lower()
+upper()
+splitlines()
+index()
+find()
+split()
+count()
+replace()
+format()
+join()
+和列表一样支持分片
+
+"{0}'s password is {1}".format(username, password)
+'1000{0[0]} = 1{0[1]}'.format(si_suffixes)
+'1MB = 1000{0.modules[humansize].SUFFIXES[1000][0]}'.format(sys)
+
+
+query = 'user=pilgrim&database=master&password=PapayaWhip'
+a_list = query.split("&")
+a_list_and_list = [s.split("=") for s in a_list]
+a_dict  = dict(a_list_and_list)
+>>> a_dict
+{'database': 'master', 'password': 'PapayaWhip', 'user': 'pilgrim'}
+
+
+
+字节:
+    字符是一种抽象。一个不可变(immutable)的Unicode编码的字符序列叫做string。一串由0到255之间的数字组成的序列叫做bytes对象
+    b'' ：定义字节
+
+    by = b'abcd\x65'
+    by += b'\xff'
+    bytearray(by)[0] = 102
+    s.count(by.decode('ascii'))
+
+    bytes支持len、+号连接、下标访问但不能修改，因为不可变，需要使用bytearry转换后修改。
+    不能连接string 和 bytes。连接前需要对bytes编码后片。python3不会自动将bytes转换成string和相反操作。
+
+    bytes 对象拥有decode()方法解码成字符串，字符串也有一个encode()编码成byte。
+
+    >>> a_string = '深入 Python'
+    >>> a_byte = a_string.encode('utf-8')
+    >>> a_string.encode("GB2312")
+    >>> a_byte.decode()
+    '深入 Python'
+    >>> a_byte.decode('GB2312')
+    Traceback (most recent call last):
+      File "<stdin>", line 1, in <module>
+    UnicodeDecodeError: 'gb2312' codec can't decode byte 0x85 in position 4: illegal multibyte sequence
+
+
+
+
+-----------------------------------------------------正则---------------------------------------------------
+import re
+re.sub(r'','',str)
+
+
+#1#只替换ROAD
+s = '100 BROAD ROAD APT. 3'
+re.sub(r'\bROAD\b','AD.',s)
+
+松散正则表达式:
+    和一般正则区别:
+        空白符被忽略
+        注释信息被忽略
+
+    pattern = '''
+                ^                   # beginning of string
+                M{0,3}              # thousands ‐ 0 to 3 Ms
+                (CM|CD|D?C{0,3})    # hundreds ‐ 900 (CM), 400 (CD), 0‐300 (0 to 3 Cs),
+                                    # or 500‐800 (D, followed by 0 to 3 Cs)
+                (XC|XL|L?X{0,3})    # tens ‐ 90 (XC), 40 (XL), 0‐30 (0 to 3 Xs),
+                                    # or 50‐80 (L, followed by 0 to 3 Xs)
+                (IX|IV|V?I{0,3})    # ones ‐ 9 (IX), 4 (IV), 0‐3 (0 to 3 Is),
+                                    # or 5‐8 (V, followed by 0 to 3 Is)
+                $                   # end of string
+            '''
+
+
+    电话号码正则:
+        规则:
+            800‐555‐1212
+            800 555 1212
+            800.555.1212
+            (800) 555‐1212
+            1‐800‐555‐1212
+            800‐555‐1212‐1234
+            800‐555‐1212x1234
+            800‐555‐1212 ext. 1234
+            work 1‐(800) 555.1212 #1234
+
+            区域号800  交换码555   最后四码1212  以及可选分机号1234
+
+        phonePattern = re.compile(r'''
+                                    (\d{3})
+                                    \D*
+                                    (\d{3})
+                                    \D*
+                                    (\d{4})
+                                    \D*(\d{4})
+                                    $
+                                    ''')
+        phonePattern.search('work 1‐(800) 555.1212 #1234').groups()
+
