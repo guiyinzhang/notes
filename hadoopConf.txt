@@ -1,0 +1,989 @@
+os          hostname            ip
+suse11   hadoop-184-master  100.136.53.184
+suse11   hadoop-196-slave1  100.136.53.196
+suse11   hadoop-200-slave2  100.136.53.200
+suse11   hadoop-188-slave3  100.136.53.188
+
+
+------------------------------------------->hadoop用户 环境准备
+1:#修改对应的主机名称
+export HOSTNAME=hadoop_196_slave3
+echo $HOSTNAME>/etc/HOSTNAME
+/etc/rc.d/boot.localnet stop
+/etc/rc.d/boot.localnet start
+
+2：
+a :在master上生成密匙，并copy .pub到每个slave上面。保证master能各每个slave无密码登录
+b : 反之，在slave上面执行步骤，保护第个slave能够无密码便当master
+ssh-keygen –t rsa –P ''
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+
+root 检查 /etc/ssh/sshd_config 文件，放开如下注释:/RSAAuthentication/PubkeyAuthentication/AuthorizedKeysFile
+
+ssh-copy-id -i ~/.ssh/id_rsa.pub hadoop@hadoop-196-slave1
+ssh-copy-id -i ~/.ssh/id_rsa.pub hadoop@hadoop-200-slave2
+ssh-copy-id -i ~/.ssh/id_rsa.pub hadoop@hadoop-188-slave3
+
+3.在主机上面测试无密码登录
+ssh hadoop@hadoop-184-master
+ssh hadoop@hadoop-196-slave1
+ssh hadoop@hadoop-200-slave2
+ssh hadoop@hadoop-188-slave3
+
+------------------------------------------->root 安装JDK
+root :
+        mkdir /usr/java
+        mv ...  /usr/java
+        tar -zvxf / rpm -ivh
+        chown -R root.root jdk1.7.0_79
+#set java environment
+export JAVA_HOME=/usr/java/jdk1.7.0_79/
+export JRE_HOME=/usr/java/jdk1.7.0_79/jre
+export CLASSPATH=.:CLASSPATH:JAVA_HOME/lib:$JRE_HOME/lib
+export PATH=$PATH:JAVAHOME/bin:$JRE_HOME/bin
+
+source / .    /etc/profile
+
+
+安装其它机器
+1.copy jdk file for other suse
+    scp -r /usr/java/ root@hadoop-196-slave1:/usr/
+2.set java environment
+3.test
+
+
+------------------------------------------->root Hadoop集群安装
+1.添加hadoop运行环境变更
+vi /etc/hadoop/hadoop-env.sh
+export JAVA_HOME=/usr/java/jdk1.7.0_79/
+export HADOOP_COMMON_HOME=/usr/hadoop/
+
+2.root 下修改profile
+# set hadoop environment
+export HADOOP_HOME=/usr/hadoop
+export PATH=$PATH:$HADOOP_HOME/bin
+
+3.修改配置文件(cd /usr/hadoop/etc/hadoop):
+a.core-site.xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl" ?>
+    <configuration>
+        <property>
+            <name>hadoop.tmp.dir</name>
+            <value>/usr/hadoop/temp</value>
+            <description>Abase for other temporary directories.</description>
+        </property>
+        <property>
+            <name>fs.default.name</name>
+            <value>hdfs://100.136.53.184:9000</value>
+        </property>
+        <property>
+            <name>io.file.buffer.size</name>
+            <value>4096</value>
+        </property>
+    </configuration>
+
+
+b.hdfs-site.xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl" ?>
+    <configuration>
+        <property>
+            <name>dfs.namenode.secondary.http.address</name>
+            <value>hadoop-184-master:50090</value>
+        </property>
+        <property>
+            <name>dfs.namenode.name.dir</name>
+            <value>file:/usr/hadoop/dfs/name</value>
+        </property>
+        <property>
+            <name>dfs.datanode.data.dir</name>
+            <value>file:/usr/hadoop/dfs/data</value>
+        </property>
+        <property>
+            <name>dfs.namenode.handler.count</name>
+            <value>100</value>
+        </property>
+        <property>
+            <name>dfs.replication</name>
+            <value>1</value>
+        </property>
+        <property>
+            <name>dfs.webhdfs.enabled</name>
+            <value>true</value>
+        </property>
+    </configuration>
+c.yarn-site.xml
+    <?xml version="1.0" ?>
+    <configuration>
+        <property>
+            <name>yarn.acl.enable</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>yarn.admin.acl</name>
+            <value>*</value>
+        </property>
+        <property>
+            <name>yarn.log-aggregation-enable</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>
+            <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.address</name>
+            <value>hadoop-184-master:8032</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.scheduler.address</name>
+            <value>hadoop-184-master:8030</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.resource-tracker.address</name>
+            <value>hadoop-184-master:8035</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.admin.address</name>
+            <value>hadoop-184-master:8033</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.webapp.address</name>
+            <value>hadoop-184-master:8088</value>
+        </property>
+        <property>
+            <name>yarn.resourcemanager.hostname</name>
+            <value>hadoop-184-master</value>
+        </property>
+        <property>
+            <name>yarn.nodemanager.aux-services</name>
+            <value>mapreduce_shuffle</value>
+        </property>
+    </configuration>
+
+d.mapred-site.xml
+    <?xml version="1.0" encoding="UTF-8" ?>
+    <?xml-stylesheet type="text/xsl" href="configuration.xsl" ?>
+    <configuration>
+        <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+        </property>
+        <property>
+            <name>mapred.reduce.tasks</name>
+            <value>12</value>
+        </property>
+        <property>
+            <name>mapred.tasktracker.map.tasks.maximum</name>
+            <value>6</value>
+        </property>
+        <property>
+            <name>mapred.tasktracker.reduce.tasks.maximum</name>
+            <value>6</value>
+        </property>
+        <property>
+            <name>mapreduce.framework.name</name>
+            <value>yarn</value>
+        </property>
+        <property>
+            <name>mapreduce.jobhistory.address</name>
+            <value>hadoop-184-master:10020</value>
+        </property>
+        <property>
+            <name>mapreduce.jobhistory.webapp.address</name>
+            <value>hadoop-184-master:19888</value>
+        </property>
+                <!--
+        <property>
+          <name>mapreduce.framework.name</name>
+          <value>1536</value>
+        </property>
+        <property>
+          <name>mapreduce.map.java.opts</name>
+          <value>-Xmx1024M</value>
+        </property>
+        <property>
+          <name>mapreduce.reduce.memory.mb</name>
+          <value>3072</value>
+        </property>
+        <property>
+          <name>mapreduce.reduce.java.opts</name>
+          <value>-Xmx2560M</value>
+        </property>
+        <property>
+          <name>mapreduce.task.io.sort.mb</name>
+          <value>512</value>
+        </property>
+        <property>
+          <name>mapreduce.task.io.sort.factor</name>
+          <value>100</value>
+        </property>
+        <property>
+          <name>mapreduce.reduce.shuffle.parallelcopies</name>
+          <value>50</value>
+        </property>
+        -->
+        <property>
+            <name>mapred.job.tracker</name>
+            <value>http://100.136.53.184:9001</value>
+        </property>
+    </configuration>
+
+
+4.复制hadoop到slave上面，profile-----> set hadoop environment
+    scp -r /usr/hadoop root@hadoop-188-slave3:/usr
+    chown -R hadoop.users hadoop
+
+5.在master上面执行格式化:
+    hadoop namenode -format
+    重新format时要执行:
+        rm -fr /usr/hadoop/dfs/data/current /usr/hadoop/dfs/name/current /usr/hadoop/temp/ /usr/hadoop/logs
+        mkdir /usr/hadoop/temp
+
+
+6.启动集群(关闭slave主机的防火墙):
+    前提:关闭slave主机的防火墙
+    在sbin目录下:
+        第一种 : sh start-all.sh
+        第二种 : sh start-dfs.sh
+                 sh start-yarn.sh
+    #查看hdfs
+    http://100.136.53.184:50070/dfshealth.html#tab-overview
+
+    #查看yarn
+    http://100.136.53.184:8088/cluster
+
+
+    启动脚本 脚本说明
+    start-all.sh 启动所有的Hadoop守护进程。包括NameNode、 Secondary NameNode、DataNode、JobTracker、 TaskTrack
+    stop-all.sh 停止所有的Hadoop守护进程。包括NameNode、 Secondary NameNode、DataNode、JobTracker、 TaskTrack
+    start-dfs.sh 启动Hadoop HDFS守护进程NameNode、SecondaryNameNode和DataNode
+    stop-dfs.sh 停止Hadoop HDFS守护进程NameNode、SecondaryNameNode和DataNode
+    hadoop-daemons.sh start namenode 单独启动NameNode守护进程
+    hadoop-daemons.sh stop namenode 单独停止NameNode守护进程
+    hadoop-daemons.sh start datanode 单独启动DataNode守护进程
+    hadoop-daemons.sh stop datanode 单独停止DataNode守护进程
+    hadoop-daemons.sh start secondarynamenode 单独启动SecondaryNameNode守护进程
+    hadoop-daemons.sh stop secondarynamenode 单独停止SecondaryNameNode守护进程
+    start-mapred.sh 启动Hadoop MapReduce守护进程JobTracker和TaskTracker
+    stop-mapred.sh 停止Hadoop MapReduce守护进程JobTracker和TaskTracker
+    hadoop-daemons.sh start jobtracker 单独启动JobTracker守护进程
+    hadoop-daemons.sh stop jobtracker 单独停止JobTracker守护进程
+    hadoop-daemons.sh start tasktracker 单独启动TaskTracker守护进程
+    hadoop-daemons.sh stop tasktracker 单独启动TaskTracker守护进程
+
+
+
+
+======================Hadoop RPC机制========================================================
+RPC:即Remote Procdure Call / 远程过程调用
+RPC使用:跨JVM实现远程透明(不关心底层通信细节)调用，类似于webService，soap 、restfull等。常用于分布式程序
+
+Hadoop的 进程 间交互都是通过RPC来进行的，比如Namenode与Datanode直接，Jobtracker与Tasktracker之间等。
+
+RPC特点:
+    透明:对调用者提供透明及抽象访问。
+    高性能:RPC Server提代高并发，能同时处理多个client的请求。
+    可控性:jdk实现了RMI，可控性少，故hadoop自己实现了。
+
+
+RMI （Remote Method Invocation）
+RMI 采用stubs 和 skeletons 来进行远程对象(remote object)的通讯。stub 充当远程对象的客户端代理，有着和远程对象相同的远程接口，远程对象的调用实际是通过调用该对象的客户端代理对象stub来完成的，通过该机制RMI就好比它是本地工作，采用tcp/ip协议，客户端直接调用服务端上的一些方法。优点是强类型，编译期可检查错误，缺点是只能基于JAVA语言，客户机与服务器紧耦合。
+RMI和webServer区别：前者采用TCP，可序列化对象，只能在java JVM中，后者采用HTTP/HTTPS，无语言和平台限制。
+
+Hadoop中的RPC机制:
+    4部分:
+        1.序列化层c/s通信传递采用hadoop 序列化类或自定义Writable类型。
+        2.通过动态代理和反射实现调用。动态代理java只支持接口，不支持类，请注意。
+        3.采用TCP/IP的socket通信。
+        4.Server采用NIO，实现事件驱动模型，提高并发能力。
+
+    例子:
+        Hadoop RPC在整个Hadoop中应用非常广泛，Client、 DataNode、NameNode之间的通讯全靠它了。例如：我们平时操作HDFS的时候，使用的是FileSystem类，它的内部有个 DFSClient对象，这个对象负责与NameNode打交道。在运行时，DFSClient在本地创建一个NameNode的代理，然后就操作这个代 理，这个代理就会通过网络，远程调用到NameNode的方法，也能返回值。
+
+        eclise.create()
+        DistributedFileSystem.create()
+        DFSClient.create()
+        DFSOutputStream:
+            1 :nameNode.crate()
+            1 :streamer类:
+                1.向nameNode申请block。
+                1.向DataNode写数据
+
+    涉及的技术:
+        1.动态代理，java只支持接口的动态代理
+        2.反射，动态加载类
+        3.序列化
+        4.使用非阻塞异步的NIO。http://weixiaolu.iteye.com/blog/1479656
+
+    Hadoop RPC对外提供的接口:
+        Hadoop RPC对外主要提供了两种接口（见类org.apache.hadoop.ipc.RPC），分别是：
+            //构造一个客户端代理对象（该对象实现了某个协议），用于向服务器发送RPC请求。
+    　　（1）public static <T> ProtocolProxy <T> getProxy/waitForProxy(…)
+            //为某个协议（实际上是Java接口）实例构造一个服务器对象，用于处理客户端发送的请求。
+    　　（2）public static Server RPC.Builder (Configuration).build()
+    使用:
+        1）定义RPC协议或者服务接口，需要继承 VersionedProtocol。用于控制不同版本。
+        　　RPC协议是客户端和服务器端之间的通信接口，它定义了服务器端对外提供的服务接口。
+
+    　　（2）实现RPC协议或者服务接口的实现者
+        　　Hadoop RPC协议通常是一个Java接口，用户需要实现该接口。
+
+    　　（3）构造和启动RPC SERVER
+             MyProxy proxy = new MyProxy();
+            final Server server = RPC.getServer(proxy, IPAddress, PORT, new Configuration());
+            server.start();
+        　　直接使用静态类Builder构造一个RPC Server，并调用函数start()启动该Server。
+
+    　　（4）构造RPC Client并发送请求
+            IProxyProtocol proxy = (IProxyProtocol) RPC.waitForProxy(
+            IProxyProtocol.class, IProxyProtocol.VERSION, inetSocketAddress,
+            new Configuration());
+        　　使用静态方法getProxy构造客户端代理对象，直接通过代理对象调用远程端的方法。
+
+JPS查看的就是RPC服务。
+    如 nameNode源码:
+        private void initialize(Configuration conf) throws IOException {
+        ......
+        // create rpc server
+        InetSocketAddress dnSocketAddr = getServiceRpcServerAddress(conf);
+        if (dnSocketAddr != null) {
+          int serviceHandlerCount =
+            conf.getInt(DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY,
+                        DFSConfigKeys.DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT);
+          this.serviceRpcServer = RPC.getServer(this, dnSocketAddr.getHostName(),
+              dnSocketAddr.getPort(), serviceHandlerCount,
+              false, conf, namesystem.getDelegationTokenSecretManager());
+          this.serviceRPCAddress = this.serviceRpcServer.getListenerAddress();
+          setRpcServiceServerAddress(conf);
+        }
+        this.server = RPC.getServer(this, socAddr.getHostName(),
+            socAddr.getPort(), handlerCount, false, conf, namesystem
+            .getDelegationTokenSecretManager());
+       ......
+    }
+
+
+
+
+
+
+===============hdfs 操作============================================================================
+HDFS是hadoop的分布式文件系统，全称：Hadoop Distributed Filesystem。由1个master(call me NameNode)和N个slaver组成（call me datanode）。其中namenode负责存储元数据,控制和协调datanode存储文件数据。通过写多份（可定义，默认1）的方式实现数据的可靠性和读取的高效性。
+
+设计目标:
+    1. 硬件错误是常态而不是异常；（最核心的设计目标—>HDFS被设计为运行在众多的普通硬件上，所以硬件故障是很正常的。因此，错误检测并快速恢复是HDFS最核心的设计目标）
+    2. 流式数据访问；（HDFS更关注数据访问的高吞吐量）
+    3. 大规模数据集；（HDFS的典型文件大小大多都在GB甚至TB级别）
+    4. 简单一致性模型；（一次写入，多次读取的访问模式）
+    5. 移动计算比移动数据更为划算；（对于大文件来说，移动计算比移动数据的代价要低）
+
+主要特点：
+    1. 适合存储大文件，对海量小文件效率较低。这主要是由于存储在namenode上的大量小文件的文件元数据会让namenode成为瓶颈。
+    2. 标准流式访问。一次写入，多次读取是最高效的访问模式，只支持文件的追加写，不支持随机访问。
+    3. 对数据节点的硬件要求低，可靠性高，单台或多台节点故障一般不会中断服务（只要不是文件所在的所有副本存放节点都故障）
+    4. 适合做大数据量的离线分析，不适合做第时延的联机事务业务访问。
+
+HDFS的数据块
+HDFS的数据块（block）是该文件系统的最小读写单位，默认64M（本地磁盘文件系统一般为512K）之所以设置为比较大的块，目的是最小化寻址时间，使文件系统的传输速度尽可能的取决于磁盘本身的性能。
+
+
+NameNode :
+    管理文件元数据，包括文件的大小，块位置，目录。主要维护以下两套数据:
+        1.文件目录与块的映射关系。是静态的，存储disk上，通过fsimage and edits files维护。
+        2.块写节点的映射关系。是动态的，不持久化，cluster start时创建。
+DataNode :
+    存储数据块。当datanode start时，dataNode 遍历本地文件系统，产生HDFS数据块和本地文件系统的对应关系，并发送给(ReportBlock)nameNode，ReportBlock包含DataNode上的all block list。
+
+可靠性:
+    冗余备份，类似于存储RAID组。
+    备份存放：由于各机架及机架内通信的宽带不一样导致存储策略很关键，例如，replication为3的时，会有3个相同数据，在全部完整的情况下，client可能只读取一个DataNode就能获取所有数据。
+              HDFS采用一种称为机架感知（Rack- aware）的策略来改进数据的可靠性、可用性和网络带宽的利用率。在大多数情况下，HDFS副本系数是默认为3，HDFS的存放策略是将一个副本存放在 本地机架节点上，一个副本存放在同一个机架的另一个节点上，最后一个副本放在不同机架的节点上。
+              特点:
+                1.减少了机架间的数据传输，提高了写操作的效率。
+                2.机架的错误远远比节点的错误少，所以这种策略不会影响到数据的可靠性和可用性。
+                3.提高读取效率。
+    heartbeat: 周期性地从集群中的每个DataNode接受心跳包和块报告，NameNode可以根据这个报告验证映射和其他文件系统元数据。收到心跳包，说明该 DataNode工作正常。如果DataNode不能发送心跳信息，NameNode会标记最近没有心跳的DataNode为宕机，并且不会给他们发送任 何I/O请求。
+    安全性
+    快照
+------------------
+写入:
+    1.HDFS Client 请求(文件元信息)distributed filesystem RPC代理 create 操作，然后转交到nameNode节点上，nameNode根据文件信息和当前dataNode情况，对文件进行分块存储进行整理并返回到client。
+    2.HDFS Client将文件划分为多个文件块，根据DataNode的地址信息，按顺序写入到每一个DataNode块中。
+    3.根据dataNode 的ack packet确认包，close 流并send result to nameNode。
+
+读取:
+    1.HDFS Client send rquest distributed filesystem RPC代理 open 操作，然后到nameNode上，nameNode根据文件名字及参数，返回对应的块信息。
+    2.HDFS Client并发读取文件信息。
+
+
+常用命令：
+http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/HDFSCommands.html#dfs
+
+hdfs dfs –ls <path>
+hdfs dfs –lsr <path>    //递归
+hdfs dfs –mkdir <path>
+hdfs dfs –put <localsrc> ... <dst>
+hdfs dfs –cp <src> <dst>
+hdfs dfs –mv <src> <dst>
+hdfs dfs –rm <path>
+hdfs dfs –rmr <path>    //递归
+hdfs dfs –cat <src>
+hdfs dfs                //查看文件系统的命令帮助
+hdfs dfs –help <cmd>    //查看具体命令的使用帮助
+
+
+HDFS的JAVA-API
+HDFS分布式文件系统的JAVA-API提供了丰富的访问接口。主要包括：目录的创建，列表，查询，删除和文件的创建(写入)，读取等。
+
+------------------------------------------------------------------create
+Configuration conf = new Configuration();
+/*FileSystem类是用于通用文件系统的一个抽象基类(除了HDFS之外，Apache提供用于其他文件系统的FileSystem对象实现，包括KosmosFileSystem、NativeS3FileSystem、RawLocalFileSystem和S3FileSystem)。它可能被实现为分布式文件系统，或者被实现为使用本地已连接磁盘的“本地”版本。本地版本用于小规模的Hadoop实例和测试。所有可能会使用HDFS的用户代码都要用到FileSystem对象。*/
+FileSystem fileSystem = FileSystem.get(URI.create(hdfsPath), conf);
+
+/*Path，它代表文件系统中文件或目录的名字,可以使用一个代表HDFS上文件/目录位置的字符串来创建Path对象。将FileSystem和Path对象进行组合，可以实现对HDFS文件和目录的多种编程操作:
+Path filePath = new Path(file name);
+………………………………………………
+if(fs.exists(filePath))
+//do something
+………………………………………………
+if(fs.isFile(filePath))
+//do something
+………………………………………………
+Boolean result = fs.createNewFile(filePath);
+………………………………………………
+Boolean result = fs.delete(filePath);
+………………………………………………
+FSDataInputStream in = fs.open(filePath);
+FSDataOutputStream out = fs.create(filePath);
+*/
+FSDataOutputStream out = fileSystem.create(new Path(hdfsPath));
+in = new BufferedInputStream(new FileInputStream(new File(localPath)));
+IOUtils.copyBytes(in, out, 4096, false);
+out.hsync();
+out.close();
+
+------------------------------------------------------------------get
+Configuration conf = new Configuration();
+FileSystem fileSystem = FileSystem.get(URI.create(hdfsPath), conf);
+
+//是Java I/O包中DataInputStream和DataOutputStream的子类，Seekable和PositionedReadable接口，从而实现了用于查找和从给定位置读取的方法
+FSDataInputStream in = null;
+OutputStream out = null;
+try {
+    in = fileSystem.open(new Path(hdfsPath));
+    out = new BufferedOutputStream(new FileOutputStream(new File(localPath)));
+    IOUtils.copyBytes(in, out, 4096, !print);
+    logger.info("get file form hdfs to local: " + hdfsPath + ", " + localPath);
+    if (print) {
+        in.seek(0);
+        IOUtils.copyBytes(in, System.out, 4096, true);
+    }
+} finally {
+    IOUtils.closeStream(out);
+}
+
+
+写租约
+当以写入方式打开文件时，打开文件的客户端会被授予一个独占的写租约，用于保护该文件。这意味着在该客户端完成操作之前，没有其他客户端能够写入该文件。为确保没有“不辞而别的”客户端占用租约，租约会周期性地过期。租约的使用有效地确保了两个应用程序不会同时写入一个给定文件(与数据库中的写锁相似)。
+租约的生命周期由软限制和硬限制来限定。在软限制期间，写入者可以独占地访问文件。如果软限制过期且客户端没能关闭文件或者更新租约(通过向NameNode发送心跳)，那么其他客户端可以抢占该租约。如果硬限制(一小时)过期且客户端没能更新租约，那么HDFS认为客户端已经退出，并自动替写入者关闭文件，然后恢复租约。
+写入者的租约并不会阻止其他客户端读取该文件。一个文件可能有多个并发的读取者。
+
+================YARN========================================================================================
+ 本质上是hadoop的操作系统(类似于win/linux)，突破MapReduce性能瓶颈和使用局限性，完成内存/CPU的资源分布和任务调度。
+目的是在hadoop上面完成运行多个应用程序并处理相关的数据集。这样多类型的应用程序就可以高效、可控运行于同一个集群中。
+让hadoop完成单一的应用程序到多应用程序的操作系统。其它类型的应用程序包括：机器学习，图像分析，流分析和互动查询功能
+Hive就是由Facebook开发的HDFS上层的SQL类型的数据仓库工具，但是后台的数据处理还要通过MapReduce。 Hive很消耗资源，会影响其它同时运行的作业。 其它Hadoop相关的数据分析子项目也都是类似的情况。
+
+架构:
+完成JobTrack的两个任务：资源管理 /  作业调度和监控。 分别对应全局一个RM和若干AM
+RM和NodeManager完成构成数据计算框架。
+RM由Scheduler和ApplicationManager组成:
+Scheduler负责给应用程序分配资源，只根据应用程序的需求(container：CPU/内存/network)执行调度。
+ApplicationManager负责接收作业提交及向Scheduler请求适当的资源容器(container)。监控和跟踪应用程序及资源使用情况和进展，负责重启应用程序。完成和NM的协同工作和监控任务。
+
+yarn core : ResourceScheduler
+它负责将节点上的资源封装成container，并按照一定的约束条件（比如队列容量限制 or 按队列分配，每个队列有一定的资源分配上限等）分配给各个application。
+资源分配模型:
+在YARN中，用户以队列的形式组织，每个用户可属于一个或多个队列，且只能向这些队列中提交application。每个队列被划分了一定比例的资源。
+分配过程是异步的。ResourceScheduler分配container给应用程序后，不立刻push推给AM，而是放到cache，等待AM请求container，
+它是基于事件:
+NODE_REMOVED : 从可分配资源总量中移除相应的资源量
+NODE_ADDED : 新增的资源量添加到可分配资源总量中
+APPLICATION_ADDED : ResourceManager收到一个新的Application,资源管理器需要为每个application维护一个独立的数据结构，以便于统一管理和资源分配。资源管理器需将该Application添加到相应的数据结构中
+APPLICATION_REMOVED : Application运行结束，从相应的数据结构中清除
+CONTAINER_EXPIRED : 当资源调度器将一个container分配给某个ApplicationMaster后，如果该ApplicationMaster在一定时间间隔内没有使用该container，则资源调度器会对该container进行再分配。
+NODE_UPDATE : important : NM通过hearbeat向RM汇报各个container运行状态时，会触发本事件，由于可能此时有container被释放，所以会触发资源的重新分配。
+
+调度器:
+FIFO:default:批处理
+Capacity Scheduler和Fair Scheduler:多租户调度器，它采用树形多队列的形式组织资源，更适合公司应用场景
+
+sum up :
+
+yarn是操作系统，RM分配资源给应用程序(用户提交作业到队列)。NM start完成资源的供给和隔离，其中的供给是向RM汇报资源，RM形成container，分配给应用程序Task，NM按照要求给Task提供资源，保证资源独占，形成隔离。NM上有AM，由NM启动AM。AM启动container，长时间不启动会被回归重新分配。
+工作流:
+    RM start后，NM start时向RM汇报资源，当用户提交task时，RM分配container给task，RM通知NM启动AM，AM获取container后启动container，这时task start。AM监控task并汇总。NM hearbeat汇报contianer状态给RM，RM判断是否回收、重新分配。
+资源分配时，内存和cpu都被虚拟virtual。内存不足可能导致kill task，cpu不足不会kill task，but long time task。
+================ hadoop 透明加密 Hadoop Key Management Server(KMS) transparent==============================
+
+------------------------------------------>keytool使用
+http://blog.csdn.net/xiaohai0504/article/details/7598178
+http://blog.csdn.net/xueyepiaoling/article/details/6524200
+
+*.keystore(*.jks)为证书库，包含:
+    密钥实体（Key entity）——密钥（secret key）又或者是私钥和配对公钥（采用非对称加密）
+    可信任的证书实体（trusted certificate entries）——只包含公钥（可导出）
+
+*.crt为证书 只包含公钥
+
+#创建证书库
+keytool -genkey -alias KMS -keyalg RSA -keysize 1024 -keystore C:/kms.keystore -validity 365 -dname "CN=z,OU=rt,O=rd,L=cd,ST=sc,C=cn"
+
+keytool -genkey -alias gyz -keyalg RSA -keysize 1024 -keystore /usr/hadoop/kms/kms.keystore -validity 365 -dname "CN=z,OU=rt,O=rd,L=cd,ST=sc,C=cn"
+
+#查看证书库
+keytool -list -keystore c:/kms.keystore
+
+#导出别名为KMS的证书
+keytool -export -alias KMS -file c:/kms.crt -keystore c:/kms.keystore
+
+#导入证书
+keytool -import -file c:/kms.crt -keystore c:/kms.keystore
+
+#查看证书
+keytool -printcert -file c:/kms.crt
+
+#删除证书库中别名为KMS的证书
+keytool -delete -keystore c:/kms.keystore -alias KMS
+
+#修改别名为KMS的密码
+keytool -keypasswd -alias KMS -keystore c:/kms.keystore
+
+
+----------------------------------------->jarsigner使用
+作用：
+a.对JAR文件签名            jarsigner [ options ] jarfile alias
+b.校验签名以及签名JAR文件的完整性     jarsigner -verify [ options ] jarfile
+
+JAR文件可以同时包含多个package的类文件，图片，声音以及数字数据，一边更快更方便的发布。jar工具用来创建JAR文件，从技术角度来说，任何zip文件都可以被看作是JAR文件,虽然使用jar创建的JAR文件包含META-INF/MANIFEST.MF文件。
+
+数字签名是从一个实体（人、公司等）的某些数据（正被“签名”的数据）和私钥计算出来的位串。与手写的签名一样，数字签名有很多有用的特性：
+1.真实性
+2.不可能被伪造（假设私钥没有泄露）
+3.已签名的数据不能被修改；如果被修改了，签名将不再被校验为可信的。为了给文件生成实体的签名，该实体首先必须与一对公/私钥相关联，以及一个或多个鉴别其公钥的证书。证书是来自一个实体的已被数字签署的声明，表示某个其它实体的公钥有特定值。
+
+
+使用keytool 创建和管理密钥仓库(keystore)后，jarsigner使用来自密钥仓库(keystore)的密钥和证书信息为JAR文件生成数字签名。
+
+------------------------------------------>kms加密过程
+write file:
+    1.dfs_client send start file rquest to nameNode.
+    2.nameNode在内存中获取被kms加密的密钥.
+    3.send file status and EDEK to client.
+    4.dfs_client send EDEK to KMS_Server and response DEK to client.
+    5.dfs_client encrypt data using EDK.
+    6.dfs_client send encrypt data to dataNode.
+
+open file:
+    1.dfs_client send open file rquest to nameNode.
+    2.nameNode在内存中获取被kms加密的密钥.
+    3.send file blocks info and EDEK to client.
+    4.dfs_client send EDEK to KMS_Server and response DEK to client.
+    5.dfs_client get DataNode encrypt data.
+    6.dfs_client decrypt data using EDK.
+
+
+
+-----------------------------------------
+[logging]
+    default = FILE:/var/lib/kerberos/krb5kdc/krb5libs.log
+    kdc = FILE:/var/lib/kerberos/krb5kdc/krb5kdc.log
+    admin_server = FILE:/var/lib/kerberos/krb5kdc/kadmind.log
+
+[libdefaults]
+    default_realm = HADOOP
+    dns_lookup_realm = false
+    dns_lookup_kdc = false
+    ticket_lifetime = 24h
+    renew_lifetime = 7d
+    forwardable = true
+    allow_weak_crypto = true
+    default_tkt_enctypes = rc4-hmac
+    default_tgs_enctypes = rc4-hmac
+
+[realms]
+    HADOOP = {
+        kdc = HADOOP
+        admin_server = HADOOP
+    }
+
+----------------------------------------------------------
+[kdcdefaults]
+    kdc_ports = 88
+    kdc_tcp_ports = 88
+
+[realms]
+    HADOOP = {
+        kadmind_port = 749
+        #master_key_type = aes256-cts
+        acl_file = /var/lib/kerberos/krb5kdc/kadm5.acl
+        dict_file = /var/lib/kerberos/krb5kdc/kadm5.dict
+        admin_keytab = /var/lib/kerberos/krb5kdc/kadm5.keytab
+        supported_enctypes = aes256-cts:normal aes128-cts:normal des3hmac-sha1:normal arcfour-hmac:normal des-hmac-sha1:normal des-cbc-md5:normal des-cbc-crc:normal
+    }
+
+---------------------------------------------------------
+scp /etc/krb5.conf hadoop-196-slave1:/etc/krb5.conf
+scp /etc/krb5.conf hadoop-200-slave2:/etc/krb5.conf
+scp /etc/krb5.conf hadoop-188-slave3:/etc/krb5.conf
+
+---------------------------------------------------------
+kdb5_util -P gyz@123 -r HADOOP create -s
+
+---------------------------------------------------------
+chkconfig --level 35 krb5kdc on
+chkconfig --level 35 kadmind on
+service krb5kdc start
+service kadmind start
+
+---------------------------------------------------------
+kadmin.local -q "addprinc root/admin@HADOOP"
+gyz@123
+
+
+--------------------------------------------------------hadoop
+addprinc -randkey hadoop/hadoop-184-master@HADOOP
+addprinc -randkey hadoop/hadoop-196-slave1@HADOOP
+addprinc -randkey hadoop/hadoop-200-slave2@HADOOP
+addprinc -randkey hadoop/hadoop-188-slave3@HADOOP
+
+----------------------------------------------------------
+mkdir hadoop/hdfs_keytab
+run kadmin.local:
+
+ktadd -k hadoop_hadoop-184-master.keytab hadoop/hadoop-184-master@HADOOP
+ktadd -k hadoop_hadoop-184-master.keytab HTTP/hadoop-184-master@HADOOP
+ktadd -k hadoop_hadoop-196-slave1.keytab hadoop/hadoop-196-slave1@HADOOP
+ktadd -k hadoop_hadoop-196-slave1.keytab hadoop/hadoop-196-slave1@HADOOP
+ktadd -k hadoop_hadoop-200-slave2.keytab hadoop/hadoop-200-slave2@HADOOP
+ktadd -k hadoop_hadoop-200-slave2.keytab HTTP/hadoop-200-slave2@HADOOP
+ktadd -k hadoop_hadoop-188-slave3.keytab hadoop/hadoop-188-slave3@HADOOP
+ktadd -k hadoop_hadoop-188-slave3.keytab HTTP/hadoop-188-slave3@HADOOP
+
+copy  slaves:
+
+scp hadoop_hadoop-184-master.keytab root@hadoop-184-master:/etc/hadoop.keytab
+scp hadoop_hadoop-196-slave1.keytab root@hadoop-196-slave1:/etc/hadoop.keytab
+scp hadoop_hadoop-200-slave2.keytab root@hadoop-200-slave2:/etc/hadoop.keytab
+scp hadoop_hadoop-188-slave3.keytab root@hadoop-188-slave3:/etc/hadoop.keytab
+
+modify .keytab chmod:
+
+rm -rf /etc/hdfs.keytab
+chown hadoop:users /etc/hadoop.keytab
+chmod 400 /etc/hadoop.keytab
+
+
+scp hdfs-site.xml hadoop@hadoop-200-slave2:/usr/hadoop/etc/hadoop/
+scp hdfs-site.xml hadoop@hadoop-188-slave3:/usr/hadoop/etc/hadoop/
+
+hadoop-184-master.keytab
+hadoop-196-slave1.keytab
+hadoop-200-slave2.keytab
+hadoop-188-slave3.keytab
+kinit -k -t /etc/hadoop.keytab hadoop-196-slave1.keytab@HADOOP
+kinit -k -t /etc/hadoop.keytab hadoop-200-slave2.keytab@HADOOP
+kinit -k -t /etc/hadoop.keytab hadoop-188-slave3.keytab@HADOOP
+klist                 //查看ticket信息
+service hadoop-hdfs-namenode start     //启动NameNode
+service hadoop-hdfs-namenode status    //看一下是否启动成功。
+
+
+
+kinit -k -t /etc/hdfs.keytab hdfs/node21@HADOOP
+
+sudo kinit admin@HADOOP
+sudo net ads join
+Using short domain name – LAB
+Joined 'linuxwork' to realm 'LAB.EXAMPLE.COM'
+
+
+
+
+================================java NIO(非阻塞IO)=========================================================
+IO 和 NIO区别:
+    1.
+    在Java1.4之前的I/O系统中，提供的都是面向流的I/O系统，系统一次一个字节地处理数据，一个输入流产生一个字节的数据，一个输出流消费一个字节的数据，面向流的I/O速度非常慢，而在Java 1.4中推出了NIO，这是一个面向块的I/O系统，系统以块的方式处理处理，每一个操作在一步中产生或者消费一个数据库，按块处理要比按字节处理数据快的多。
+
+    2.假如现在你对阻塞I/O已有了一定了解，我们知道阻塞I/O在调用InputStream.read()方法时是阻塞的，它会一直等到数据到来时（或超时）才会返回；同样，在调用ServerSocket.accept()方法时，也会一直阻塞到有客户端连接才会返回，每个客户端连接过来后，服务端都会启动一个线程去处理该客户端的请求
+    3.旧IO是，如果读取数据，代码会阻塞直至有 可供读取的数据。同样，写入调用将会阻塞直至数据能够写入。
+    4.一个 面向块 的 I/O 系统以块的形式处理数据。每一个操作都在一步中产生或者消费一个数据块。按块处理数据比按(流式的)字节处理数据要快得多。但是面向块的 I/O 缺少一些面向流的 I/O 所具有的优雅性和简单性。
+IO工作原理:
+服务器会为每个客户端请求建立一个线程，由该线程单独负责处理一个客户请求。这种模式带来的一个问题就是线程数量的剧增，大量的线程会增大服务器的开销。大多数的实现为了避免这个问题，都采用了线程池模型，并设置线程池线程的最大数量，这由带来了新的问题，如果线程池中有200个线程，而有200个用户都在进行大文件下载，会导致第201个用户的请求无法及时处理，即便第201个用户只想请求一个几KB大小的页面。
+IO缺点：
+1. 当客户端多时，会创建大量的处理线程。且每个线程都要占用栈空间和一些CPU时间
+2. 阻塞可能带来频繁的上下文切换，且大部分上下文切换可能是无意义的。大部份的处理都是一样的。
+
+NIO的工作原理：
+1. 由一个专门的线程来处理所有的 IO 事件，并负责分发。
+2. 事件驱动机制：事件到的时候触发，而不是同步的去监视事件。注册感兴趣的特定I/O事件，如可读数据到达，新的套接字连接等等，在发生特定事件时，系统再通知我们
+3. 线程通讯：线程之间通过 wait,notify 等方式通讯。保证每次上下文切换都是有意义的。减少无谓的线程切换。
+
+Java NIO的服务端只需启动一个专门的线程来处理所有的 IO 事件，这种通信模型是怎么实现的呢？呵呵，我们一起来探究它的奥秘吧。java NIO采用了双向通道（channel）进行数据传输，而不是单向的流（stream），在通道上可以注册我们感兴趣的事件。一共有以下四种事件：
+        事件名 对应值
+        服务端接收客户端连接事件    SelectionKey.OP_ACCEPT(16)
+        客户端连接服务端事件  SelectionKey.OP_CONNECT(8)
+        读事件 SelectionKey.OP_READ(1)
+        写事件 SelectionKey.OP_WRITE(4)
+
+NIO中有几个核心对象需要掌握：
+------------缓冲区（Buffer）------------------------------------
+缓冲区实际上是一个容器对象，特殊的数组对象，更直接的说，其实就是一个数组，在NIO库中，所有数据都是用缓冲区处理的。在读取数据时，它是直接读到缓冲区中的； 在写入数据时，它也是写入到缓冲区中的；任何时候访问 NIO 中的数据，都是将它放到缓冲区中。而在面向流I/O系统中，所有数据都是直接写入或者直接将数据读取到Stream对象中。
+重要属性:
+position：指定了下一个将要被写入或者读取的元素索引，它的值由get()/put()方法自动更新，在新创建一个Buffer对象时，position被初始化为0。
+limit：指定还有多少数据需要取出(在从缓冲区写入通道时)，或者还有多少空间可以放入数据(在从通道读入缓冲区时)。
+capacity：指定了可以存储在缓冲区中的最大数据容量，实际上，它指定了底层数组的大小，或者至少是指定了准许我们使用的底层数组的容量。
+position设置为0，limit和 capacity被设置为10，在以后使用ByteBuffer对象过程中，capacity的值不会再发生变化，而其它两个个将会随着使用而变化
+
+注意:
+从buffer write data时，limit和capacity一样，所以之前写入到buffer 位置4时，position = 4,limit=4,get时,调用flip，position为0。读取数据时，必须调用filp方法完成limit=position;position=0的操作。由于position为0，能够保证下一步读取的字节是buffer first byte,limit=position保证读取的数据正好是之前写入到buffer的数据。例如:之前写到position为4，下次read时，limit = 4，postion=0。
+code :
+        FileInputStream fin = new FileInputStream("d:\\test.txt");
+        FileChannel fc = fin.getChannel();
+
+        ByteBuffer buffer = ByteBuffer.allocate(10);
+        output("初始化", buffer);//c = 10;p=0;l=10;
+
+        fc.read(buffer);
+        output("调用read()", buffer);//c=p=l=10;
+
+        buffer.flip();
+        output("调用flip()", buffer);//和初始化时一样。
+
+        while (buffer.remaining() > 0) {
+            byte b = buffer.get();
+            // System.out.print(((char)b));
+        }
+        output("调用get()", buffer);//和调用read一样。
+
+        buffer.clear();
+        output("调用clear()", buffer);//初始化一样
+
+        fin.close();
+
+缓冲区的分配>>>>>>
+        // 分配指定大小的缓冲区
+        ByteBuffer buffer1 = ByteBuffer.allocate(10);
+
+        类似于:
+
+        // 包装一个现有的数组或者指定大小的数组
+        byte array[] = new byte[10];
+        ByteBuffer buffer2 = ByteBuffer.wrap( array );
+
+缓冲区分片>>>>>>>>
+可以根据现在的buffer create child buffer,将现有的buffer切出一片作为childBuffer,两个buffer在底层的数据是share，child相当于parent的一个viewWindow。例:
+        ByteBuffer buffer = ByteBuffer.allocate( 10 );
+
+        // 缓冲区中的数据0-9
+        for (int i=0; i<buffer.capacity(); ++i) {
+            buffer.put( (byte)i );
+        }
+
+        // 创建子缓冲区
+        buffer.position( 3 );
+        buffer.limit( 7 );
+        ByteBuffer slice = buffer.slice();
+
+        // 改变子缓冲区的内容
+        for (int i=0; i<slice.capacity(); ++i) {
+            byte b = slice.get( i );//数据共享
+            b *= 10;
+            slice.put( i, b );
+        }
+
+        buffer.position( 0 );
+        buffer.limit( buffer.capacity() );
+
+        while (buffer.remaining()>0) {
+            System.out.println( buffer.get() );
+        }
+//out: 0 1 2 30 40 50 60 7 8 9
+
+只读Buffer>>>>>>>>>>>>>
+将现在Buffer通过asReadOnlyBuffer()返回一个只读缓冲区，形成数据共享。
+
+
+直接缓冲区>>>>>>>>>>>>>
+直接缓冲区是为加快I/O速度，使用一种特殊方式为其分配内存的缓冲区，JDK文档中的描述为：给定一个直接字节缓冲区，Java虚拟机将尽最大努 力直接对它执行本机I/O操作。也就是说，它会在每一次调用底层操作系统的本机I/O操作之前(或之后)，尝试避免将缓冲区的内容拷贝到一个中间缓冲区中 或者从一个中间缓冲区中拷贝数据。要分配直接缓冲区，需要调用allocateDirect()方法，而不是allocate()方法，使用方式与普通缓冲区并无区别。
+
+内存映射文件I/O>>>>>>>>
+内存映射文件I/O是一种读和写文件数据的方法，它可以比常规的基于流或者基于通道的I/O快的多。内存映射文件I/O是通过使文件中的数据出现为 内存数组的内容来完成的，这其初听起来似乎不过就是将整个文件读到内存中，但是事实上并不是这样。一般来说，只有文件中实际读取或者写入的部分才会映射到内存中。如下面的示例代码：
+
+------------通道（Channel） ------------------------------------
+通道是一个对象，通过它可以读取和写入数据，当然了所有数据都通过Buffer对象来处理。我们永远不会将字节直接写入通道中，相反是将数据写入包含一个或者多个字节的缓冲区。同样不会直接从通道中读取字节，而是将数据从通道读入缓冲区，再从缓冲区获取这个字节。
+通道相当于IO的stream。但不同于stream的是它是双向的。channel通常和buffer交互。
+分散和聚集:
+    一个通道对应多个buffer的顺序读写。
+------------选择器（Selector）   ------------------------------------
+注册感兴趣的特定I/O事件，如可读数据到达，新的套接字连接等等，在发生特定事件时，系统再通知我们。NIO中实现非阻塞I/O的核心对象就是Selector，Selector就是注册各种I/O事件地 方，而且当那些事件发生时，就是这个对象告诉我们所发生的事件
+|-------------------------------------------------------------------------------------------|
+|        ^                           |                           ^ |                        |
+|        |                           |                           | |    selectableChanel    |
+|        |                           v                           | v                        |
+|-------------------------------------------------------------------------------------------|
+|SelectionKey Write          SelectionKey Read              SelectionKey Write&Read         |
+|-------------------------------------------------------------------------------------------|
+                                Selector
+
+从图中可以看出，当有读或写等任何注册的事件发生时，可以从Selector中获得相应的SelectionKey，同时从 SelectionKey中可以找到发生的事件和该事件所发生的具体的SelectableChannel，以获得客户端发送过来的数据。关于 SelectableChannel的可以参考
+code:
+    ---server----
+    // 创建Selector对象
+    Selector sel = Selector.open();
+
+    // 创建可选择通道，并配置为非阻塞模式
+    ServerSocketChannel server = ServerSocketChannel.open();
+    server.configureBlocking(false);
+
+    // 绑定通道到指定端口
+    ServerSocket socket = server.socket();
+    InetSocketAddress address = new InetSocketAddress(port);
+    socket.bind(address);
+
+    // 向Selector中注册感兴趣的事件
+    server.register(sel, SelectionKey.OP_ACCEPT);
+    创建了ServerSocketChannel对象，并调用configureBlocking()方法，配置为非阻塞模式，接下来的三行代码把该通道绑定到指定端口，最后向Selector中注册事件，此处指定的是参数是OP_ACCEPT，即指定我们想要监听accept事件，也就是新的连接发 生时所产生的事件，对于ServerSocketChannel通道来说，我们唯一可以指定的参数就是OP_ACCEPT
+    -----------
+    public void listen() {
+        System.out.println("listen on " + port);
+        try {
+            while(true) {
+                // 该调用会阻塞，直到至少有一个事件发生
+                selector.select();
+                Set<SelectionKey> keys = selector.selectedKeys();
+                Iterator<SelectionKey> iter = keys.iterator();
+                while (iter.hasNext()) {
+                    SelectionKey key = (SelectionKey) iter.next();
+                    iter.remove();
+                    process(key);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    在非阻塞I/O中，内部循环模式基本都是遵循这种方式。首先调用select()方法，该方法会阻塞，直到至少有一个事件发生，然后再使用selectedKeys()方法获取发生事件的SelectionKey，再使用迭代器进行循环
+    ------------
+    protected void process(SelectionKey key) throws IOException{
+        // 接收请求
+        if (key.isAcceptable()) {
+            ServerSocketChannel server = (ServerSocketChannel) key.channel();
+            SocketChannel channel = server.accept();
+            channel.configureBlocking(false);
+            channel.register(selector, SelectionKey.OP_READ);
+        }
+        // 读信息
+        else if (key.isReadable()) {
+            SocketChannel channel = (SocketChannel) key.channel();
+            int count = channel.read(buffer);
+            if (count > 0) {
+                buffer.flip();
+                CharBuffer charBuffer = decoder.decode(buffer);
+                name = charBuffer.toString();
+                SelectionKey sKey = channel.register(selector, SelectionKey.OP_WRITE);
+                sKey.attach(name);
+            } else {
+                channel.close();
+            }
+            buffer.clear();
+        }
+        // 写事件
+        else if (key.isWritable()) {
+            SocketChannel channel = (SocketChannel) key.channel();
+            String name = (String) key.attachment();
+
+            ByteBuffer block = encoder.encode(CharBuffer.wrap("Hello " + name));
+            if(block != null)
+            {
+                channel.write(block);
+            }
+            else
+            {
+                channel.close();
+            }
+
+         }
+}   此处分别判断是接受请求、读数据还是写事件，分别作不同的处理。
+
+--------------------------------------------------------------------------
+异步Socket中应当注意的事情
+
+1. 读
+
+异步socket最基本的理念就是事件通知，前面也说了，有事件通知你了，你才该做你应当做的事情。在异步socket中当注册了一个OP_READ事件后，你就等着Selector通知你吧，如果没有通知你，你在家睡大觉都行。
+在这里，我们有人出现的错误就是受同步的影响，自己去主动读，而且还搞出了多线程，如果仔细考虑一下，就不会出现这个问题了。同步socket中，调用read方法读取IO中的数据时，通常情况下如果没有数据read方法会阻塞，且是同步的，所以当多个线程同时访问时，read方法是线程安全的。
+
+而在异步下就不同，异步是不会阻塞的，有什么就返回什么，你主动去读，只要有数据，你就可以拿走，在多线程的情况下，也许你是想让第一个线程读取，but此时来数据时正好是线程2读到了，那线程2就高高兴兴的拿去，而线程1还在苦苦等待，这样导致数据混乱不说，如果后面再也不来数据了，线程1就是死循环啦。
+
+2. 写
+
+在异步socket中，写是唯一一个主动点的操作，但是也不能直接去写Channel，而是应当先把自身注册为OP_WRITABLE，这时Selector就会发现你的存在，并把给发一个write事件，你这时后就可以写了，不过这时候有个小小的技巧，就是你执行写操作之前，请取消掉你的写注册，否则你的cpu肯定是100%。
+
+3. 等待
+
+在传统的服务器编程中，由于对于每个请求都是产生的一个线程，因此你在你每个请求线程中wait也好,sleep也好，不会影响别人。但是异步不同，他的主线程只有一个，基本上每个处理都是线性的，也就是说处理完第一个，然后才能处理第二个，因此nio是一个极好的处理短连接的架构。
+
+我们现在出现的问题是，有人受同步的影响，没有搞清异步是如何处理，竟然在方法处理中用上sleep，而且一等还是3秒，这意味着什么，3秒才能处理一个请求，My god，我要一个3秒才能处理一个请求的服务器干嘛啊，还是60年代啊：（
+
+如果出现这样的需要等待的情况，应当另起一个线程（推荐使用线程池）去完成这个“长”时间的任务，或者将其它交给一个消息队列，通过发消息的方式将给别人去完成也行，客户端能等，你服务器怎么也能等呢？写出这样的代码，基本上一个服务器也就废了。
+
+
+
+NIO数据读取:--------------------------
+1. 从FileInputStream获取Channel
+2. 创建Buffer
+3. 将数据从Channel读取到Buffer中
+    code :
+        FileInputStream fin = new FileInputStream("c:\\test.txt");
+
+        // 获取通道
+        FileChannel fc = fin.getChannel();
+
+        // 创建缓冲区
+        ByteBuffer buffer = ByteBuffer.allocate(1024);
+
+        // 读取数据到缓冲区
+        fc.read(buffer);
+
+        buffer.flip();
+
+        while (buffer.remaining()>0) {
+            byte b = buffer.get();
+            System.out.print(((char)b));
+        }
+
+        fin.close()
+
+NIO数据读取写入:----------------------------
+1. 从FileInputStream获取Channel
+2. 创建Buffer
+3. 将数据从Channel写入到Buffer中
+    code :
+        FileOutputStream fout = new FileOutputStream( "c:\\test.txt" );
+
+        FileChannel fc = fout.getChannel();
+
+        ByteBuffer buffer = ByteBuffer.allocate( 1024 );
+
+        for (int i=0; i<message.length; ++i) {
+            buffer.put( message[i] );
+        }
+
+        buffer.flip();
+
+        fc.write( buffer );
+
+        fout.close();
